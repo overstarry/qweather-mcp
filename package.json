@@ -1,22 +1,30 @@
 {
   "name": "qweather-mcp",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "1.0.6",
   "type": "module",
+  "description": "QWeather MCP SDK CLI Tool",
+  "files": [
+    "build",
+    "/cli.js"
+  ],
   "bin": {
-    "weather": "./build/index.js"
+    "qweather-mcp": "cli.js"
   },
   "scripts": {
     "build": "tsc && node scripts/set-permissions.js",
     "build:windows": "tsc"
   },
-  "files": [
-    "build"
+  "keywords": [
+    "cli",
+    "qweather",
+    "mcp",
+    "tool"
   ],
-  "keywords": [],
-  "author": "",
+  "author": "overstarry",
   "license": "ISC",
-  "description": "",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
     "zod": "^3.24.2"

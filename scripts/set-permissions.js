@@ -1,16 +1,15 @@
-import { chmod } from 'fs/promises';
-import { platform } from 'os';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-async function setPermissions() {
-    // 只在非 Windows 平台上设置可执行权限
-    if (platform() !== 'win32') {
-        try {
-            await chmod('./build/index.js', 0o755);
-            console.log('Permissions set successfully for build/index.js');
-        } catch (err) {
-            console.error('Failed to set permissions:', err);
-        }
-    }
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildDir = path.resolve(__dirname, '../build');
+const indexFile = path.join(buildDir, 'index.js');
+
+try {
+    // 添加执行权限
+    fs.chmodSync(indexFile, '755');
+    console.log('已成功设置 index.js 文件的执行权限');
+} catch (error) {
+    console.error('设置文件权限时出错:', error);
 }
-
-setPermissions();
