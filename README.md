@@ -14,8 +14,6 @@ Get your API Key [here](https://console.qweather.com/).
 # stdio server
 npx -y qweather-mcp
 
-# sse server
-npx -y qweather-mcp --sse
 ```
 
 Environment variables:
