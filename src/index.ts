@@ -91,7 +91,7 @@ server.tool(
                 content: [
                     {
                         type: "text",
-                        text: "API请求失败",
+                        text: "API request failed",
                     },
                 ],
             };
@@ -102,7 +102,7 @@ server.tool(
                 content: [
                     {
                         type: "text",
-                        text: `API返回错误代码: ${locationData.code}`,
+                        text: `API returned error code: ${locationData.code}`,
                     },
                 ],
             };
@@ -113,7 +113,7 @@ server.tool(
                 content: [
                     {
                         type: "text",
-                        text: "未找到相关城市信息",
+                        text: "No relevant city information found",
                     },
                 ],
             };
@@ -121,10 +121,10 @@ server.tool(
 
         const cities = locationData.location.map(city =>
             [
-                `城市: ${city.name}`,
+                `City: ${city.name}`,
                 `ID: ${city.id}`,
-                `位置: ${city.adm1} ${city.adm2}`,
-                `坐标: ${city.lat},${city.lon}`,
+                `Location: ${city.adm1} ${city.adm2}`,
+                `Coordinates: ${city.lat},${city.lon}`,
                 "---"
             ].join("\n")
         );
@@ -133,7 +133,7 @@ server.tool(
             content: [
                 {
                     type: "text",
-                    text: `查询结果:\n\n${cities.join("\n")}`,
+                    text: `Query results:\n\n${cities.join("\n")}`,
                 },
             ],
         };
