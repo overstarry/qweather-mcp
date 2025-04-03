@@ -1,5 +1,7 @@
 # qweather-mcp
 
+[![smithery badge](https://smithery.ai/badge/@overstarry/qweather-mcps)](https://smithery.ai/server/@overstarry/qweather-mcps)
+
 MCP server for [QWeather](https://www.qweather.com/) API.
 
 This project provides weather information query capabilities through Model Context Protocol (MCP).
@@ -48,3 +50,4 @@ QWEATHER_API_KEY=<your-api-key>
 ## License
 
 MIT.
+
