@@ -32,7 +32,7 @@ QWEATHER_API_KEY=<your-api-key>
       "command": "npx",
       "args": ["-y", "qweather-mcp"],
       "env": {
-        "QWEATHER_API_BASE": "https://api.qweather.com",
+        "QWEATHER_API_BASE": "<your-api-url>",
         "QWEATHER_API_KEY": "<your-api-key>"
       }
     }
