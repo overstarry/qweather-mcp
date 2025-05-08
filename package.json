@@ -1,6 +1,6 @@
 {
   "name": "qweather-mcp",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "type": "module",
   "description": "QWeather MCP SDK CLI Tool",
   "files": [
