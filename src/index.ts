@@ -60,6 +60,41 @@ interface QWeatherNowResponse {
     };
 }
 
+interface QWeatherDailyResponse {
+    code: string;
+    updateTime: string;
+    fxLink: string;
+    daily: Array<{
+        fxDate: string;
+        sunrise: string;
+        sunset: string;
+        moonrise: string;
+        moonset: string;
+        moonPhase: string;
+        moonPhaseIcon: string;
+        tempMax: string;
+        tempMin: string;
+        iconDay: string;
+        textDay: string;
+        iconNight: string;
+        textNight: string;
+        wind360Day: string;
+        windDirDay: string;
+        windScaleDay: string;
+        windSpeedDay: string;
+        wind360Night: string;
+        windDirNight: string;
+        windScaleNight: string;
+        windSpeedNight: string;
+        humidity: string;
+        precip: string;
+        pressure: string;
+        vis: string;
+        cloud: string;
+        uvIndex: string;
+    }>;
+}
+
 interface QWeatherLocationResponse {
     code: string;
     location: Array<{
@@ -180,6 +215,58 @@ server.tool(
                 {
                     type: "text",
                     text: weatherText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-weather-forecast",
+    "Get weather forecast for a location using QWeather API",
+    {
+        location: z.string().describe("Location ID for the city"),
+        days: z.enum(["3d", "7d", "10d", "15d", "30d"]).describe("Number of forecast days"),
+    },
+    async ({ location, days }) => {
+        const weatherData = await makeQWeatherRequest<QWeatherDailyResponse>(`/v7/weather/${days}`, {
+            location,
+        });
+
+        if (!weatherData || weatherData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "获取天气预报数据失败",
+                    },
+                ],
+            };
+        }
+
+        const forecastText = [
+            `${days.replace('d', '天')}天气预报 (地点ID: ${location}):`,
+            `更新时间: ${weatherData.updateTime}`,
+            '',
+            ...weatherData.daily.map(day => [
+                `日期: ${day.fxDate}`,
+                `温度: ${day.tempMin}°C ~ ${day.tempMax}°C`,
+                `白天: ${day.textDay}`,
+                `夜间: ${day.textNight}`,
+                `日出: ${day.sunrise || '无数据'}  日落: ${day.sunset || '无数据'}`,
+                `降水量: ${day.precip}mm`,
+                `湿度: ${day.humidity}%`,
+                `风况: 白天-${day.windDirDay}(${day.windScaleDay}级), 夜间-${day.windDirNight}(${day.windScaleNight}级)`,
+                `紫外线指数: ${day.uvIndex}`,
+                '---'
+            ].join('\n'))
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: forecastText,
                 },
             ],
         };
