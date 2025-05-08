@@ -110,34 +110,89 @@ interface QWeatherLocationResponse {
     }>;
 }
 
+// server.tool(
+//     "lookup-city",
+//     "Look up city information by name",
+//     {
+//         cityName: z.string().describe("Name of the city to look up"),
+//     },
+//     async ({ cityName }) => {
+//         const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+//             location: cityName,
+//         });
+
+//         if (!locationData) {
+//             return {
+//                 content: [
+//                     {
+//                         type: "text",
+//                         text: "API request failed",
+//                     },
+//                 ],
+//             };
+//         }
+
+//         if (locationData.code !== "200") {
+//             return {
+//                 content: [
+//                     {
+//                         type: "text",
+//                         text: `API returned error code: ${locationData.code}`,
+//                     },
+//                 ],
+//             };
+//         }
+
+//         if (!locationData.location || locationData.location.length === 0) {
+//             return {
+//                 content: [
+//                     {
+//                         type: "text",
+//                         text: "No relevant city information found",
+//                     },
+//                 ],
+//             };
+//         }
+
+//         const cities = locationData.location.map(city =>
+//             [
+//                 `City: ${city.name}`,
+//                 `ID: ${city.id}`,
+//                 `Location: ${city.adm1} ${city.adm2}`,
+//                 `Coordinates: ${city.lat},${city.lon}`,
+//                 "---"
+//             ].join("\n")
+//         );
+
+//         return {
+//             content: [
+//                 {
+//                     type: "text",
+//                     text: `Query results:\n\n${cities.join("\n")}`,
+//                 },
+//             ],
+//         };
+//     }
+// );
+
 server.tool(
-    "lookup-city",
-    "Look up city information by name",
+    "get-weather-now",
+    "Get current weather for a location using QWeather API",
     {
-        cityName: z.string().describe("Name of the city to look up"),
+        cityName: z.string().describe("Name of the city to look up weather for"),
     },
     async ({ cityName }) => {
+        // First, look up the city to get its ID
         const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
             location: cityName,
         });
 
-        if (!locationData) {
+        if (!locationData || locationData.code !== "200") {
             return {
                 content: [
                     {
                         type: "text",
-                        text: "API request failed",
-                    },
-                ],
-            };
-        }
-
-        if (locationData.code !== "200") {
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: `API returned error code: ${locationData.code}`,
+                        text: "Failed to find the specified city",
                     },
                 ],
             };
@@ -148,42 +203,18 @@ server.tool(
                 content: [
                     {
                         type: "text",
-                        text: "No relevant city information found",
+                        text: "No matching city found",
                     },
                 ],
             };
         }
 
-        const cities = locationData.location.map(city =>
-            [
-                `City: ${city.name}`,
-                `ID: ${city.id}`,
-                `Location: ${city.adm1} ${city.adm2}`,
-                `Coordinates: ${city.lat},${city.lon}`,
-                "---"
-            ].join("\n")
-        );
+        // Use the first matching city's ID
+        const cityId = locationData.location[0].id;
+        const cityInfo = locationData.location[0];
 
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `Query results:\n\n${cities.join("\n")}`,
-                },
-            ],
-        };
-    }
-);
-
-server.tool(
-    "get-weather-now",
-    "Get current weather for a location using QWeather API",
-    {
-        location: z.string().describe("Location ID for the city"),
-    },
-    async ({ location }) => {
         const weatherData = await makeQWeatherRequest<QWeatherNowResponse>("/v7/weather/now", {
-            location,
+            location: cityId,
         });
 
         if (!weatherData || weatherData.code !== "200") {
@@ -199,7 +230,7 @@ server.tool(
 
         const now = weatherData.now;
         const weatherText = [
-            `Current Weather for location ${location}:`,
+            `Current Weather for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
             `Temperature: ${now.temp}°C (Feels like: ${now.feelsLike}°C)`,
             `Condition: ${now.text}`,
             `Wind: ${now.windDir} Scale ${now.windScale}`,
@@ -225,12 +256,43 @@ server.tool(
     "get-weather-forecast",
     "Get weather forecast for a location using QWeather API",
     {
-        location: z.string().describe("Location ID for the city"),
+        cityName: z.string().describe("Name of the city to look up weather for"),
         days: z.enum(["3d", "7d", "10d", "15d", "30d"]).describe("Number of forecast days"),
     },
-    async ({ location, days }) => {
+    async ({ cityName, days }) => {
+        // First, look up the city to get its ID
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's ID
+        const cityId = locationData.location[0].id;
+        const cityInfo = locationData.location[0];
+
         const weatherData = await makeQWeatherRequest<QWeatherDailyResponse>(`/v7/weather/${days}`, {
-            location,
+            location: cityId,
         });
 
         if (!weatherData || weatherData.code !== "200") {
@@ -238,26 +300,26 @@ server.tool(
                 content: [
                     {
                         type: "text",
-                        text: "获取天气预报数据失败",
+                        text: "Failed to retrieve weather forecast data",
                     },
                 ],
             };
         }
 
         const forecastText = [
-            `${days.replace('d', '天')}天气预报 (地点ID: ${location}):`,
-            `更新时间: ${weatherData.updateTime}`,
+            `${days.replace('d', ' Days')} Weather Forecast for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            `Last Updated: ${weatherData.updateTime}`,
             '',
             ...weatherData.daily.map(day => [
-                `日期: ${day.fxDate}`,
-                `温度: ${day.tempMin}°C ~ ${day.tempMax}°C`,
-                `白天: ${day.textDay}`,
-                `夜间: ${day.textNight}`,
-                `日出: ${day.sunrise || '无数据'}  日落: ${day.sunset || '无数据'}`,
-                `降水量: ${day.precip}mm`,
-                `湿度: ${day.humidity}%`,
-                `风况: 白天-${day.windDirDay}(${day.windScaleDay}级), 夜间-${day.windDirNight}(${day.windScaleNight}级)`,
-                `紫外线指数: ${day.uvIndex}`,
+                `Date: ${day.fxDate}`,
+                `Temperature: ${day.tempMin}°C ~ ${day.tempMax}°C`,
+                `Daytime: ${day.textDay}`,
+                `Night: ${day.textNight}`,
+                `Sunrise: ${day.sunrise || 'N/A'}  Sunset: ${day.sunset || 'N/A'}`,
+                `Precipitation: ${day.precip}mm`,
+                `Humidity: ${day.humidity}%`,
+                `Wind: Day-${day.windDirDay}(Scale ${day.windScaleDay}), Night-${day.windDirNight}(Scale ${day.windScaleNight})`,
+                `UV Index: ${day.uvIndex}`,
                 '---'
             ].join('\n'))
         ].join('\n');
