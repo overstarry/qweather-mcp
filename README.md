@@ -1,5 +1,5 @@
 # qweather-mcp
-
+[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/ae24a36c-f029-49b3-9c42-fc111021add0)
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/overstarry-qweather-mcp-badge.png)](https://mseep.ai/app/overstarry-qweather-mcp)
 [![smithery badge](https://smithery.ai/badge/@overstarry/qweather-mcp)](https://smithery.ai/server/@overstarry/qweather-mcp)
 
