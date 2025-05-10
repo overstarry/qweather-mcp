@@ -110,6 +110,29 @@ interface QWeatherLocationResponse {
     }>;
 }
 
+interface QWeatherWarningResponse {
+    code: string;
+    updateTime: string;
+    fxLink: string;
+    warning: Array<{
+        id: string;
+        sender: string;
+        pubTime: string;
+        title: string;
+        startTime: string;
+        endTime: string;
+        status: string;
+        severity: string;
+        severityColor: string;
+        type: string;
+        typeName: string;
+        urgency: string;
+        certainty: string;
+        text: string;
+        related: string;
+    }>;
+}
+
 interface QWeatherHourlyResponse {
     code: string;
     updateTime: string;
@@ -457,6 +480,98 @@ server.tool(
                 {
                     type: "text",
                     text: hourlyText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-weather-warning",
+    "Weather Warning API provides real-time weather warning data issued by official authorities in China and multiple countries/regions worldwide. The data includes warning issuer, publication time, warning title, detailed warning information, warning level, warning type, and other relevant information.",
+    {
+        cityName: z.string().describe("Name of the city to look up weather warnings for"),
+    },
+    async ({ cityName }) => {
+        // First, look up the city to get its ID
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's ID
+        const cityId = locationData.location[0].id;
+        const cityInfo = locationData.location[0];
+
+        const warningData = await makeQWeatherRequest<QWeatherWarningResponse>("/v7/warning/now", {
+            location: cityId,
+        });
+
+        if (!warningData || warningData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve weather warning data",
+                    },
+                ],
+            };
+        }
+
+        if (!warningData.warning || warningData.warning.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `No active weather warnings for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2})`,
+                    },
+                ],
+            };
+        }
+
+        const warningText = [
+            `Weather Warnings for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            `Last Updated: ${warningData.updateTime}`,
+            '',
+            ...warningData.warning.map(warning => [
+                `Warning Title: ${warning.title}`,
+                `Issued By: ${warning.sender}`,
+                `Publication Time: ${warning.pubTime}`,
+                `Warning Type: ${warning.typeName}`,
+                `Severity Level: ${warning.severity} (${warning.severityColor})`,
+                `Valid Period: ${warning.startTime || 'Not specified'} to ${warning.endTime || 'Not specified'}`,
+                `Status: ${warning.status}`,
+                `Details: ${warning.text}`,
+                '---'
+            ].join('\n'))
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: warningText,
                 },
             ],
         };
