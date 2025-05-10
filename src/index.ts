@@ -110,6 +110,27 @@ interface QWeatherLocationResponse {
     }>;
 }
 
+interface QWeatherHourlyResponse {
+    code: string;
+    updateTime: string;
+    fxLink: string;
+    hourly: Array<{
+        fxTime: string;
+        temp: string;
+        icon: string;
+        text: string;
+        wind360: string;
+        windDir: string;
+        windScale: string;
+        windSpeed: string;
+        humidity: string;
+        precip: string;
+        pressure: string;
+        cloud: string;
+        dew: string;
+    }>;
+}
+
 interface QWeatherMinutelyResponse {
     code: string;
     updateTime: string;
@@ -124,7 +145,7 @@ interface QWeatherMinutelyResponse {
 
 server.tool(
     "get-weather-now",
-    "Get current weather for a location using QWeather API",
+    "Real-time weather API provides current weather conditions for global cities. Available data includes: temperature, feels-like temperature, weather conditions, wind direction, wind force scale, relative humidity, precipitation, atmospheric pressure, and visibility. The data is updated in real-time to provide the most accurate current weather information.",
     {
         cityName: z.string().describe("Name of the city to look up weather for"),
     },
@@ -201,7 +222,7 @@ server.tool(
 
 server.tool(
     "get-weather-forecast",
-    "Get weather forecast for a location using QWeather API",
+    "Weather forecast API provides detailed weather predictions for global cities, supporting forecasts from 3 to 30 days. Available data includes: sunrise/sunset times, moonrise/moonset times, temperature range, weather conditions, wind direction and speed, relative humidity, precipitation, atmospheric pressure, cloud cover, and UV index. The forecast is updated daily to ensure accuracy.",
     {
         cityName: z.string().describe("Name of the city to look up weather for"),
         days: z.enum(["3d", "7d", "10d", "15d", "30d"]).describe("Number of forecast days"),
@@ -284,7 +305,7 @@ server.tool(
 
 server.tool(
     "get-minutely-precipitation",
-    "Get minutely precipitation forecast for a location using QWeather API",
+    "Minute-level precipitation forecast API provides precise precipitation predictions for the next 2 hours in global cities. Available data includes precipitation type (rain/snow) and precipitation amount for each minute. This high-precision forecast is particularly useful for outdoor activity planning and real-time weather monitoring.",
     {
         cityName: z.string().describe("Name of the city to look up precipitation forecast for"),
     },
@@ -353,6 +374,89 @@ server.tool(
                 {
                     type: "text",
                     text: precipText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-hourly-forecast",
+    "Hourly weather forecast API provides detailed weather information for global cities for the next 24-168 hours. Available data includes: temperature, weather conditions, wind force, wind speed, wind direction, relative humidity, atmospheric pressure, precipitation probability, dew point temperature, and cloud cover. The forecast data is updated hourly to ensure accuracy.",
+    {
+        cityName: z.string().describe("Name of the city to look up weather for"),
+        hours: z.enum(["24h", "72h", "168h"]).default("24h").describe("Number of forecast hours (24h, 72h, or 168h)"),
+    },
+    async ({ cityName, hours }) => {
+        // First, look up the city to get its ID
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's ID
+        const cityId = locationData.location[0].id;
+        const cityInfo = locationData.location[0];
+
+        const hourlyData = await makeQWeatherRequest<QWeatherHourlyResponse>(`/v7/weather/${hours}`, {
+            location: cityId,
+        });
+
+        if (!hourlyData || hourlyData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve hourly forecast data",
+                    },
+                ],
+            };
+        }
+
+        const hourlyText = [
+            `${hours.replace('h', '-Hour')} Weather Forecast - ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            `Last Updated: ${hourlyData.updateTime}`,
+            '',
+            ...hourlyData.hourly.map(hour => [
+                `Time: ${hour.fxTime.split('T')[1].split('+')[0]}`,
+                `Temperature: ${hour.temp}°C`,
+                `Weather: ${hour.text}`,
+                `Wind: ${hour.windDir} (Scale ${hour.windScale}, ${hour.windSpeed}km/h)`,
+                `Humidity: ${hour.humidity}%`,
+                `Precipitation: ${hour.precip}mm`,
+                `Pressure: ${hour.pressure}hPa`,
+                hour.cloud ? `Cloud Cover: ${hour.cloud}%` : null,
+                hour.dew ? `Dew Point: ${hour.dew}°C` : null,
+                '---'
+            ].filter(Boolean).join('\n'))
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: hourlyText,
                 },
             ],
         };
