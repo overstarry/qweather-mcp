@@ -110,6 +110,17 @@ interface QWeatherLocationResponse {
     }>;
 }
 
+interface QWeatherMinutelyResponse {
+    code: string;
+    updateTime: string;
+    fxLink: string;
+    summary: string;
+    minutely: Array<{
+        fxTime: string;
+        precip: string;
+        type: string;
+    }>;
+}
 
 server.tool(
     "get-weather-now",
@@ -265,6 +276,83 @@ server.tool(
                 {
                     type: "text",
                     text: forecastText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-minutely-precipitation",
+    "Get minutely precipitation forecast for a location using QWeather API",
+    {
+        cityName: z.string().describe("Name of the city to look up precipitation forecast for"),
+    },
+    async ({ cityName }) => {
+        // First, look up the city to get its location coordinates
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's coordinates
+        const cityInfo = locationData.location[0];
+        const location = `${cityInfo.lon},${cityInfo.lat}`;
+
+        const precipData = await makeQWeatherRequest<QWeatherMinutelyResponse>("/v7/minutely/5m", {
+            location: location,
+        });
+
+        if (!precipData || precipData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve precipitation forecast data",
+                    },
+                ],
+            };
+        }
+
+        const precipText = [
+            `Minutely Precipitation Forecast - ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            `Forecast Description: ${precipData.summary}`,
+            `Last Updated: ${precipData.updateTime}`,
+            '',
+            '2-Hour Precipitation Forecast:',
+            ...precipData.minutely.map(minute =>
+                `Time: ${minute.fxTime.split('T')[1].split('+')[0]} - ${minute.type === 'rain' ? 'Rain' : 'Snow'}: ${minute.precip}mm`
+            ),
+            '',
+            `Data Source: ${precipData.fxLink}`,
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: precipText,
                 },
             ],
         };
