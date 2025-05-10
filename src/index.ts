@@ -292,6 +292,57 @@ interface QWeatherAirQualityHourlyResponse {
     }>;
 }
 
+interface QWeatherAirQualityDailyResponse {
+    code: string;
+    metadata: {
+        tag: string;
+    };
+    days: Array<{
+        forecastStartTime: string;
+        forecastEndTime: string;
+        indexes: Array<{
+            code: string;
+            name: string;
+            aqi: number;
+            aqiDisplay: string;
+            level?: string;
+            category?: string;
+            color: {
+                red: number;
+                green: number;
+                blue: number;
+                alpha: number;
+            };
+            primaryPollutant?: {
+                code: string;
+                name: string;
+                fullName: string;
+            } | null;
+            health?: {
+                effect: string;
+                advice: {
+                    generalPopulation: string;
+                    sensitivePopulation: string;
+                };
+            };
+        }>;
+        pollutants: Array<{
+            code: string;
+            name: string;
+            fullName: string;
+            concentration: {
+                value: number;
+                unit: string;
+            };
+            subIndexes?: Array<{
+                code: string;
+                aqi: number;
+                aqiDisplay: string;
+            }>;
+        }>;
+    }>;
+}
+
 server.tool(
     "get-weather-now",
     "Real-time weather API provides current weather conditions for global cities. Available data includes: temperature, feels-like temperature, weather conditions, wind direction, wind force scale, relative humidity, precipitation, atmospheric pressure, and visibility. The data is updated in real-time to provide the most accurate current weather information.",
@@ -991,7 +1042,7 @@ server.tool(
                     minute: '2-digit',
                     hour12: false,
                     timeZone: 'UTC'
-                });
+                }) + ' UTC';
 
                 const indexInfo = hour.indexes.map(index => {
                     const healthInfo = index.health ? [
@@ -1032,6 +1083,135 @@ server.tool(
                 {
                     type: "text",
                     text: hourlyText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-air-quality-daily",
+    "Daily Air Quality Forecast API provides air quality predictions for the next 3 days, including AQI values, pollutant concentrations, and health recommendations. The data includes various air quality standards and specific concentrations of pollutants like PM2.5, PM10, NO2, O3, SO2.",
+    {
+        cityName: z.string().describe("Name of the city to look up air quality forecast for"),
+    },
+    async ({ cityName }) => {
+        // First, look up the city to get its coordinates
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's coordinates
+        const cityInfo = locationData.location[0];
+        // Format coordinates to have at most 2 decimal places
+        const lat = Number(cityInfo.lat).toFixed(2);
+        const lon = Number(cityInfo.lon).toFixed(2);
+
+        // Use path parameters to call the daily air quality forecast API
+        const airQualityDailyEndpoint = `/airquality/v1/daily/${lat}/${lon}`;
+        const airQualityData = await makeQWeatherRequest<QWeatherAirQualityDailyResponse>(
+            airQualityDailyEndpoint,
+            {}, // No query parameters needed
+            [lat, lon] // Path parameters in order: latitude, longitude
+        );
+
+        if (!airQualityData || !airQualityData.days || airQualityData.days.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve air quality forecast data",
+                    },
+                ],
+            };
+        }
+
+        // Format output text
+        const dailyText = [
+            `3-Day Air Quality Forecast for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            '',
+            ...airQualityData.days.map(day => {
+                const startTime = new Date(day.forecastStartTime).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'UTC'
+                }) + ' UTC';
+
+                const endTime = new Date(day.forecastEndTime).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'UTC'
+                }) + ' UTC';
+
+                const indexInfo = day.indexes.map(index => {
+                    const healthInfo = index.health ? [
+                        `Health Effects: ${index.health.effect}`,
+                        `Health Advice:`,
+                        `  General Population: ${index.health.advice.generalPopulation}`,
+                        `  Sensitive Population: ${index.health.advice.sensitivePopulation}`
+                    ].join('\n') : '';
+
+                    return [
+                        `Air Quality Index:`,
+                        `  ${index.name}: ${index.aqiDisplay}`,
+                        `  Level: ${index.level || 'N/A'}`,
+                        `  Category: ${index.category || 'Unknown'}`,
+                        index.primaryPollutant ? `  Primary Pollutant: ${index.primaryPollutant.fullName}` : '',
+                        healthInfo
+                    ].filter(Boolean).join('\n');
+                }).join('\n\n');
+
+                const pollutantInfo = day.pollutants.length > 0 ? [
+                    'Pollutant Concentrations:',
+                    ...day.pollutants.map(pollutant =>
+                        `  ${pollutant.fullName}: ${pollutant.concentration.value}${pollutant.concentration.unit}`
+                    )
+                ].join('\n') : 'No pollutant data available';
+
+                return [
+                    `Forecast Period: ${startTime} to ${endTime}`,
+                    indexInfo,
+                    pollutantInfo,
+                    '---'
+                ].join('\n\n');
+            }).join('\n')
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: dailyText,
                 },
             ],
         };
