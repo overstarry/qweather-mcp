@@ -133,6 +133,20 @@ interface QWeatherWarningResponse {
     }>;
 }
 
+interface QWeatherIndicesResponse {
+    code: string;
+    updateTime: string;
+    fxLink: string;
+    daily: Array<{
+        date: string;
+        type: string;
+        name: string;
+        level: string;
+        category: string;
+        text: string;
+    }>;
+}
+
 interface QWeatherHourlyResponse {
     code: string;
     updateTime: string;
@@ -572,6 +586,123 @@ server.tool(
                 {
                     type: "text",
                     text: warningText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-weather-indices",
+    "Weather indices forecast API provides various life indices for cities worldwide. Supports both 1-day and 3-day forecasts. Available indices types:\n\n" +
+    "- Type 0: All indices types\n" +
+    "- Type 1: Sport (Indicates suitability for outdoor sports activities)\n" +
+    "- Type 2: Car Wash (Suggests whether it's suitable for washing cars)\n" +
+    "- Type 3: Dressing (Provides clothing recommendations based on weather)\n" +
+    "- Type 4: Fishing (Shows how favorable conditions are for fishing)\n" +
+    "- Type 5: UV (Ultraviolet radiation intensity level)\n" +
+    "- Type 6: Travel (Indicates suitability for traveling and sightseeing)\n" +
+    "- Type 7: Allergy (Risk level for allergies and pollen)\n" +
+    "- Type 8: Cold Risk (Risk level for catching a cold)\n" +
+    "- Type 9: Comfort (Overall comfort level of the weather)\n" +
+    "- Type 10: Wind (Wind conditions and their effects)\n" +
+    "- Type 11: Sunglasses (Need for wearing sunglasses)\n" +
+    "- Type 12: Makeup (How weather affects makeup wear)\n" +
+    "- Type 13: Sunscreen (Need for sun protection)\n" +
+    "- Type 14: Traffic (Weather impact on traffic conditions)\n" +
+    "- Type 15: Sports Spectating (Suitability for watching outdoor sports)\n" +
+    "- Type 16: Air Quality (Air pollution diffusion conditions)\n\n" +
+    "Note: Not all indices are available for every city. International cities mainly support types 1, 2, 4, and 5.",
+    {
+        cityName: z.string().describe("Name of the city to look up weather indices for"),
+        type: z.enum([
+            "0", // All Types
+            "1", // Sport
+            "2", // Car Wash
+            "3", // Dressing
+            "4", // Fishing
+            "5", // UV
+            "6", // Travel
+            "7", // Allergy
+            "8", // Cold Risk
+            "9", // Comfort
+            "10", // Wind
+            "11", // Sunglasses
+            "12", // Makeup
+            "13", // Sunscreen
+            "14", // Traffic
+            "15", // Sports Spectating
+            "16", // Air Quality
+        ]).describe("Type of weather index to retrieve"),
+        days: z.enum(["1d", "3d"]).default("1d").describe("Number of forecast days (1d or 3d)"),
+    },
+    async ({ cityName, type, days }) => {
+        // First, look up the city to get its ID
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's ID
+        const cityId = locationData.location[0].id;
+        const cityInfo = locationData.location[0];
+
+        const indicesData = await makeQWeatherRequest<QWeatherIndicesResponse>(`/v7/indices/${days}`, {
+            location: cityId,
+            type: type,
+        });
+
+        if (!indicesData || indicesData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve weather indices data",
+                    },
+                ],
+            };
+        }
+
+        const indicesText = [
+            `${days === "1d" ? "1-Day" : "3-Day"} Weather Indices for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            `Last Updated: ${indicesData.updateTime}`,
+            '',
+            ...indicesData.daily.map(index => [
+                `Date: ${index.date}`,
+                `Index Type: ${index.name}`,
+                `Level: ${index.level}`,
+                `Category: ${index.category}`,
+                `Suggestion: ${index.text}`,
+                '---'
+            ].join('\n'))
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: indicesText,
                 },
             ],
         };
