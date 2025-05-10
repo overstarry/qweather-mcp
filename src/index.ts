@@ -242,6 +242,56 @@ interface QWeatherAirQualityResponse {
     }>;
 }
 
+interface QWeatherAirQualityHourlyResponse {
+    code: string;
+    metadata: {
+        tag: string;
+    };
+    hours: Array<{
+        forecastTime: string;
+        indexes: Array<{
+            code: string;
+            name: string;
+            aqi: number;
+            aqiDisplay: string;
+            level?: string;
+            category?: string;
+            color: {
+                red: number;
+                green: number;
+                blue: number;
+                alpha: number;
+            };
+            primaryPollutant?: {
+                code: string;
+                name: string;
+                fullName: string;
+            } | null;
+            health?: {
+                effect: string;
+                advice: {
+                    generalPopulation: string;
+                    sensitivePopulation: string;
+                };
+            };
+        }>;
+        pollutants: Array<{
+            code: string;
+            name: string;
+            fullName: string;
+            concentration: {
+                value: number;
+                unit: string;
+            };
+            subIndexes?: Array<{
+                code: string;
+                aqi: number;
+                aqiDisplay: string;
+            }>;
+        }>;
+    }>;
+}
+
 server.tool(
     "get-weather-now",
     "Real-time weather API provides current weather conditions for global cities. Available data includes: temperature, feels-like temperature, weather conditions, wind direction, wind force scale, relative humidity, precipitation, atmospheric pressure, and visibility. The data is updated in real-time to provide the most accurate current weather information.",
@@ -871,6 +921,171 @@ server.tool(
         };
     }
 );
+
+server.tool(
+    "get-air-quality-hourly",
+    "Hourly Air Quality Forecast API provides air quality data for the next 24 hours, including AQI, pollutant concentrations, sub-indices, and health advice. The data includes various air quality standards (such as QAQI, GB-DEFRA, etc.) and specific concentrations of pollutants like PM2.5, PM10, NO2, O3, SO2.",
+    {
+        cityName: z.string().describe("Name of the city to look up air quality forecast for"),
+    },
+    async ({ cityName }) => {
+        // First, look up the city to get its coordinates
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's coordinates
+        const cityInfo = locationData.location[0];
+        // Format coordinates to have at most 2 decimal places
+        const lat = Number(cityInfo.lat).toFixed(2);
+        const lon = Number(cityInfo.lon).toFixed(2);
+
+        // Use path parameters to call the hourly air quality forecast API (latitude first, then longitude)
+        const airQualityHourlyEndpoint = `/airquality/v1/hourly/${lat}/${lon}`;
+        const airQualityData = await makeQWeatherRequest<QWeatherAirQualityHourlyResponse>(
+            airQualityHourlyEndpoint,
+            {}, // No query parameters needed
+            [lat, lon] // Path parameters in order: latitude, longitude
+        );
+
+        if (!airQualityData || !airQualityData.hours || airQualityData.hours.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve air quality forecast data",
+                    },
+                ],
+            };
+        }
+
+        // Format output text
+        const hourlyText = [
+            `24-Hour Air Quality Forecast for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            '',
+            ...airQualityData.hours.map(hour => {
+                const time = new Date(hour.forecastTime).toLocaleString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'UTC'
+                });
+
+                const indexInfo = hour.indexes.map(index => {
+                    const healthInfo = index.health ? [
+                        `Health Effects: ${translateHealthEffect(index.health.effect)}`,
+                        `Health Advice:`,
+                        `  General Population: ${translateAdvice(index.health.advice.generalPopulation)}`,
+                        `  Sensitive Population: ${translateAdvice(index.health.advice.sensitivePopulation)}`
+                    ].join('\n') : '';
+
+                    return [
+                        `Air Quality Indices:`,
+                        `  ${index.name}: ${index.aqiDisplay}`,
+                        `  Level: ${index.level || 'N/A'}`,
+                        `  Category: ${translateCategory(index.category || 'Unknown')}`,
+                        index.primaryPollutant ? `  Primary Pollutant: ${translatePollutant(index.primaryPollutant.fullName)}` : '',
+                        healthInfo
+                    ].filter(Boolean).join('\n');
+                }).join('\n');
+
+                const pollutantInfo = hour.pollutants.length > 0 ? [
+                    'Pollutant Concentrations:',
+                    ...hour.pollutants.map(pollutant =>
+                        `  ${translatePollutant(pollutant.fullName)}: ${pollutant.concentration.value}${pollutant.concentration.unit}`
+                    )
+                ].join('\n') : 'No pollutant data available';
+
+                return [
+                    `Forecast Time: ${time}`,
+                    indexInfo,
+                    pollutantInfo,
+                    '---'
+                ].join('\n\n');
+            }).join('\n')
+        ].join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: hourlyText,
+                },
+            ],
+        };
+    }
+);
+
+// Helper functions for translation
+function translateCategory(category: string): string {
+    const categoryMap: Record<string, string> = {
+        '优': 'Excellent',
+        '良': 'Good',
+        '轻度污染': 'Light Pollution',
+        '中度污染': 'Moderate Pollution',
+        '重度污染': 'Heavy Pollution',
+        '严重污染': 'Severe Pollution'
+    };
+    return categoryMap[category] || category;
+}
+
+function translatePollutant(pollutant: string): string {
+    const pollutantMap: Record<string, string> = {
+        '颗粒物（粒径小于等于2.5μm）': 'PM2.5',
+        '颗粒物（粒径小于等于10μm）': 'PM10',
+        '二氧化氮': 'NO2',
+        '臭氧': 'O3',
+        '二氧化硫': 'SO2',
+        '一氧化碳': 'CO'
+    };
+    return pollutantMap[pollutant] || pollutant;
+}
+
+function translateHealthEffect(effect: string): string {
+    const effectMap: Record<string, string> = {
+        '空气质量令人满意，基本无空气污染。': 'Air quality is satisfactory with minimal air pollution.',
+        '空气质量可接受，但某些污染物可能对极少数异常敏感人群健康有较弱影响。': 'Air quality is acceptable, but some pollutants may have a slight impact on the health of extremely sensitive individuals.',
+        '易感人群症状有轻度加剧，健康人群出现刺激症状。': 'Sensitive individuals may experience mild symptom aggravation, while healthy individuals may experience irritation symptoms.',
+        '进一步加剧易感人群症状，可能对健康人群心脏、呼吸系统有影响。': 'Further aggravation of symptoms in sensitive individuals, possible effects on the cardiovascular and respiratory systems of healthy individuals.',
+        '心脏病和肺病患者症状显著加剧，运动耐受力降低，健康人群普遍出现症状。': 'Significant aggravation of symptoms in patients with heart and lung conditions, reduced exercise tolerance, and general symptoms in healthy individuals.',
+        '健康人群运动耐受力降低，有明显强烈症状，提前出现某些疾病。': 'Reduced exercise tolerance in healthy individuals, obvious and severe symptoms, early onset of certain diseases.'
+    };
+    return effectMap[effect] || effect;
+}
+
+function translateAdvice(advice: string): string {
+    const adviceMap: Record<string, string> = {
+        '各类人群可正常活动。': 'All groups can maintain normal activities.',
+        '一般人群可正常活动。': 'General population can maintain normal activities.',
+        '极少数异常敏感人群应减少户外活动。': 'Extremely sensitive individuals should reduce outdoor activities.',
+        '儿童、老年人及心脏病、呼吸系统疾病患者应减少长时间、高强度的户外锻炼。': 'Children, elderly, and individuals with heart or respiratory conditions should reduce prolonged, high-intensity outdoor exercise.',
+        '儿童、老年人及心脏病、呼吸系统疾病患者应停留在室内，停止户外运动，一般人群减少户外运动。': 'Children, elderly, and individuals with heart or respiratory conditions should stay indoors and avoid outdoor activities. General population should reduce outdoor activities.',
+        '儿童、老年人和病人应停留在室内，避免体力消耗，一般人群避免户外活动。': 'Children, elderly, and patients should stay indoors and avoid physical exertion. General population should avoid outdoor activities.'
+    };
+    return adviceMap[advice] || advice;
+}
 
 async function main() {
     const transport = new StdioServerTransport();
