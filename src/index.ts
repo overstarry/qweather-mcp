@@ -21,8 +21,19 @@ const server = new McpServer({
     },
 });
 
-async function makeQWeatherRequest<T>(endpoint: string, params: Record<string, string>): Promise<T | null> {
-    const url = new URL(`${QWEATHER_API_BASE}${endpoint}`);
+async function makeQWeatherRequest<T>(endpoint: string, params: Record<string, string>, pathParams?: string[]): Promise<T | null> {
+    let url: URL;
+    if (pathParams && pathParams.length > 0) {
+        // Replace placeholders in endpoint with actual values
+        let endpointWithParams = endpoint;
+        pathParams.forEach(param => {
+            endpointWithParams = endpointWithParams.replace('{}', param);
+        });
+        url = new URL(`${QWEATHER_API_BASE}${endpointWithParams}`);
+    } else {
+        url = new URL(`${QWEATHER_API_BASE}${endpoint}`);
+    }
+
     Object.entries(params).forEach(([key, value]) => {
         url.searchParams.append(key, value);
     });
@@ -34,11 +45,11 @@ async function makeQWeatherRequest<T>(endpoint: string, params: Record<string, s
             }
         });
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`HTTP error! status: ${response.status}, URL: ${url.toString()}`);
         }
         return await response.json() as T;
     } catch (error) {
-        console.error("Error making QWeather request:", error);
+        console.error("Error making QWeather request:", error, "URL:", url.toString());
         return null;
     }
 }
@@ -177,6 +188,57 @@ interface QWeatherMinutelyResponse {
         fxTime: string;
         precip: string;
         type: string;
+    }>;
+}
+
+interface QWeatherAirQualityResponse {
+    code: string;
+    metadata: {
+        tag: string;
+    };
+    indexes: Array<{
+        code: string;
+        name: string;
+        aqi: number;
+        aqiDisplay: string;
+        level?: string;
+        category?: string;
+        color: {
+            red: number;
+            green: number;
+            blue: number;
+            alpha: number;
+        };
+        primaryPollutant?: {
+            code: string;
+            name: string;
+            fullName: string;
+        } | null;
+        health?: {
+            effect: string;
+            advice: {
+                generalPopulation: string;
+                sensitivePopulation: string;
+            };
+        };
+    }>;
+    pollutants: Array<{
+        code: string;
+        name: string;
+        fullName: string;
+        concentration: {
+            value: number;
+            unit: string;
+        };
+        subIndexes?: Array<{
+            code: string;
+            aqi: number;
+            aqiDisplay: string;
+        }>;
+    }>;
+    stations?: Array<{
+        id: string;
+        name: string;
     }>;
 }
 
@@ -703,6 +765,107 @@ server.tool(
                 {
                     type: "text",
                     text: indicesText,
+                },
+            ],
+        };
+    }
+);
+
+server.tool(
+    "get-air-quality",
+    "Real-time Air Quality API provides air quality data for specific locations with 1x1 kilometer precision. Includes AQI based on local standards of different countries/regions, AQI levels, colors, primary pollutants, QWeather universal AQI, pollutant concentrations, sub-indices, health advice, and related monitoring station information.",
+    {
+        cityName: z.string().describe("Name of the city to look up air quality for"),
+    },
+    async ({ cityName }) => {
+        // First, look up the city to get its coordinates
+        const locationData = await makeQWeatherRequest<QWeatherLocationResponse>("/geo/v2/city/lookup", {
+            location: cityName,
+        });
+
+        if (!locationData || locationData.code !== "200") {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to find the specified city",
+                    },
+                ],
+            };
+        }
+
+        if (!locationData.location || locationData.location.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "No matching city found",
+                    },
+                ],
+            };
+        }
+
+        // Use the first matching city's coordinates
+        const cityInfo = locationData.location[0];
+        // Format coordinates to have at most 2 decimal places
+        const lat = Number(cityInfo.lat).toFixed(2);
+        const lon = Number(cityInfo.lon).toFixed(2);
+
+        // Update API endpoint to use path parameters (latitude first, then longitude)
+        const airQualityEndpoint = `/airquality/v1/current/${lat}/${lon}`;
+        const airQualityData = await makeQWeatherRequest<QWeatherAirQualityResponse>(
+            airQualityEndpoint,
+            {}, // No query parameters needed
+            [lat, lon] // Path parameters in correct order: latitude, longitude
+        );
+
+        if (!airQualityData || !airQualityData.indexes || airQualityData.indexes.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Failed to retrieve air quality data",
+                    },
+                ],
+            };
+        }
+
+        // Format output text
+        const airQualityText = [
+            `Real-time Air Quality for ${cityInfo.name} (${cityInfo.adm1} ${cityInfo.adm2}):`,
+            '',
+            'Air Quality Indices:',
+            ...airQualityData.indexes.map(index => [
+                `${index.name}: ${index.aqiDisplay}`,
+                index.level ? `Level: ${index.level}` : null,
+                index.category ? `Category: ${index.category}` : null,
+                index.primaryPollutant ? `Primary Pollutant: ${index.primaryPollutant.fullName}` : null,
+                index.health ? [
+                    'Health Effects:',
+                    `- ${index.health.effect}`,
+                    'Health Advice:',
+                    `- General Population: ${index.health.advice.generalPopulation}`,
+                    `- Sensitive Population: ${index.health.advice.sensitivePopulation}`,
+                ].join('\n') : null,
+                '---'
+            ].filter(Boolean).join('\n')),
+            '',
+            'Pollutant Concentrations:',
+            ...airQualityData.pollutants.map(pollutant =>
+                `${pollutant.fullName}: ${pollutant.concentration.value}${pollutant.concentration.unit}`
+            ),
+            '',
+            airQualityData.stations ? [
+                'Related Monitoring Stations:',
+                ...airQualityData.stations.map(station => `- ${station.name}`),
+            ].join('\n') : null,
+        ].filter(Boolean).join('\n');
+
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: airQualityText,
                 },
             ],
         };
