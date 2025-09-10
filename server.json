@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.overstarry/qweather-mcp",
+  "description": "a qweather mcp server",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/overstarry/qweather-mcp",
+    "source": "github"
+  },
+  "version": "1.0.12",
+  "packages": [
+    {
+      "registry_type": "npm",
+      "registry_base_url": "https://registry.npmjs.org",
+      "identifier": "qweather-mcp",
+      "version": "1.0.12",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Your qweather api host",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "QWEATHER_API_BASE"
+        },
+        {
+          "description": "Your qweather api key",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "QWEATHER_API_KEY"
+        }
+      ]
+    }
+  ]
+}
