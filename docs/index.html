@@ -1,68 +1,68 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>qweather-mcp | 简介与安装</title>
+    <title>qweather-mcp | Overview & Installation</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="site-header">
       <h1>qweather-mcp</h1>
-      <p class="tagline">基于 MCP 的 QWeather 天气服务 CLI/服务器</p>
+      <p class="tagline">QWeather MCP server and CLI</p>
     </header>
 
     <main class="container">
       <section>
-        <h2>功能亮点</h2>
+        <h2>Key Features</h2>
         <ul class="list">
-          <li>实时天气查询（温度、体感、风力、湿度等）</li>
-          <li>多日天气预报（3/7/10/15/30 天）</li>
-          <li>逐分钟降水、逐小时天气</li>
-          <li>天气预警与生活指数</li>
-          <li>空气质量（实时/小时/3日）</li>
-          <li>可配置 API Base 与密钥</li>
+          <li>Real-time weather (temperature, feels-like, wind, humidity, etc.)</li>
+          <li>Multi-day forecasts (3/7/10/15/30 days)</li>
+          <li>Minutely precipitation and hourly forecast</li>
+          <li>Weather warnings and lifestyle indices</li>
+          <li>Air quality (real-time / hourly / 3-day)</li>
+          <li>Configurable API base and key</li>
         </ul>
       </section>
 
       <section>
-        <h2>安装与运行</h2>
-        <h3>方式一：Smithery（推荐）</h3>
+        <h2>Install & Run</h2>
+        <h3>Method 1: Smithery (recommended)</h3>
         <pre><code>npx -y @smithery/cli install @overstarry/qweather-mcp --client claude</code></pre>
 
-        <h3>方式二：手动配置</h3>
+        <h3>Method 2: Manual setup</h3>
         <ol class="list">
-          <li>在 QWeather 控制台获取 API Key</li>
-          <li>设置环境变量并启动：</li>
+          <li>Get your API key from the QWeather Console</li>
+          <li>Export environment variables and start the server:</li>
         </ol>
 <pre><code>export QWEATHER_API_BASE=https://api.qweather.com
 export QWEATHER_API_KEY=&lt;your-api-key&gt;
 
-# 启动 stdio 服务器
+# start stdio server
 npx -y qweather-mcp
 </code></pre>
       </section>
 
       <section>
-        <h2>可用工具（部分）</h2>
+        <h2>Available Tools (selection)</h2>
         <ul class="list">
-          <li>get-weather-now（实时天气）</li>
-          <li>get-weather-forecast（多日预报）</li>
-          <li>get-minutely-precipitation（逐分钟降水）</li>
-          <li>get-hourly-forecast（逐小时预报）</li>
-          <li>get-weather-warning（天气预警）</li>
-          <li>get-weather-indices（生活指数）</li>
-          <li>get-air-quality / hourly / daily（空气质量）</li>
+          <li>get-weather-now (current conditions)</li>
+          <li>get-weather-forecast (3/7/10/15/30-day)</li>
+          <li>get-minutely-precipitation (next 2 hours)</li>
+          <li>get-hourly-forecast (24/72/168-hour)</li>
+          <li>get-weather-warning (alerts)</li>
+          <li>get-weather-indices (lifestyle indices)</li>
+          <li>get-air-quality / hourly / daily</li>
         </ul>
       </section>
 
       <section>
-        <h2>开发提示</h2>
+        <h2>Developer Notes</h2>
         <ul class="list">
-          <li>构建：<code>npm run build</code>（TypeScript 编译并设置可执行权限）</li>
-          <li>Windows 构建：<code>npm run build:windows</code></li>
-          <li>源码：<code>src/index.ts</code>；编译输出：<code>build/index.js</code></li>
-          <li>需要环境变量：<code>QWEATHER_API_BASE</code>、<code>QWEATHER_API_KEY</code></li>
+          <li>Build: <code>npm run build</code> (TypeScript compile + set executable bit)</li>
+          <li>Windows build: <code>npm run build:windows</code></li>
+          <li>Source: <code>src/index.ts</code>; Output: <code>build/index.js</code></li>
+          <li>Required env vars: <code>QWEATHER_API_BASE</code>, <code>QWEATHER_API_KEY</code></li>
         </ul>
       </section>
     </main>
@@ -72,4 +72,3 @@ npx -y qweather-mcp
     </footer>
   </body>
   </html>
-
