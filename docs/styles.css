@@ -1,0 +1,55 @@
+:root {
+  --bg: #0b1220;
+  --panel: #121b2f;
+  --text: #e6eefc;
+  --muted: #9bb2d1;
+  --accent: #4ea1ff;
+  --code: #0e1627;
+  --border: #24314d;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.site-header {
+  padding: 40px 16px 24px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(78,161,255,0.12), rgba(78,161,255,0));
+  border-bottom: 1px solid var(--border);
+}
+.site-header h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+}
+.tagline { color: var(--muted); margin: 0; }
+
+.container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+}
+
+section { margin: 24px 0; background: var(--panel); padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+section h2 { margin-top: 0; font-size: 20px; }
+section h3 { margin-bottom: 8px; color: var(--muted); font-weight: 600; }
+
+.list { margin: 0; padding-left: 20px; }
+.list li { margin: 6px 0; }
+
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; color: #bfe1ff; background: var(--code); padding: 0 4px; border-radius: 4px; }
+pre { background: var(--code); padding: 12px; border-radius: 8px; overflow: auto; border: 1px solid var(--border); }
+pre code { padding: 0; color: #d7e9ff; }
+
+.site-footer { text-align: center; color: var(--muted); padding: 24px 12px; border-top: 1px solid var(--border); }
+
+@media (max-width: 640px) {
+  .site-header h1 { font-size: 26px; }
+}
+
