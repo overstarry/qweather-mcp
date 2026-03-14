@@ -1,74 +1,311 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>qweather-mcp | Overview & Installation</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <header class="site-header">
-      <h1>qweather-mcp</h1>
-      <p class="tagline">QWeather MCP server and CLI</p>
-    </header>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="qweather-mcp is a QWeather MCP server and CLI for current weather, forecasts, alerts, air quality, and automation workflows."
+        />
+        <title>qweather-mcp | QWeather MCP Server & CLI</title>
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <div class="page-shell">
+            <header class="hero">
+                <div class="hero-copy">
+                    <p class="eyebrow">QWeather MCP server and CLI</p>
+                    <h1>
+                        Bring weather data into your MCP workflow without extra
+                        glue code.
+                    </h1>
+                    <p class="hero-text">
+                        qweather-mcp wraps QWeather APIs into clean MCP tools
+                        for current conditions, forecasts, alerts, air quality,
+                        and lifestyle indices.
+                    </p>
 
-    <main class="container">
-      <section>
-        <h2>Key Features</h2>
-        <ul class="list">
-          <li>Real-time weather (temperature, feels-like, wind, humidity, etc.)</li>
-          <li>Multi-day forecasts (3/7/10/15/30 days)</li>
-          <li>Minutely precipitation and hourly forecast</li>
-          <li>Weather warnings and lifestyle indices</li>
-          <li>Air quality (real-time / hourly / 3-day)</li>
-          <li>Configurable API base and key</li>
-        </ul>
-      </section>
+                    <div class="hero-actions">
+                        <a class="button button-primary" href="#install"
+                            >Install now</a
+                        >
+                        <a class="button button-secondary" href="#tools"
+                            >Browse tools</a
+                        >
+                    </div>
 
-      <section>
-        <h2>Install & Run</h2>
-        <h3>Method 1: Smithery (recommended)</h3>
-        <pre><code>npx -y @smithery/cli install @overstarry/qweather-mcp --client claude</code></pre>
+                    <dl class="hero-stats">
+                        <div>
+                            <dt>Coverage</dt>
+                            <dd>
+                                Current, hourly, minutely, daily, air quality
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Runtime</dt>
+                            <dd>stdio MCP server and CLI</dd>
+                        </div>
+                        <div>
+                            <dt>Config</dt>
+                            <dd>API base and key via environment variables</dd>
+                        </div>
+                    </dl>
+                </div>
 
-        <h3>Method 2: Manual setup</h3>
-        <ol class="list">
-          <li>Get your API key from the QWeather Console</li>
-          <li>Export environment variables and start the server:</li>
-        </ol>
-<pre><code>export QWEATHER_API_BASE=https://api.qweather.com
+                <aside class="hero-panel" aria-label="Quick overview">
+                    <div class="panel-card highlight-card">
+                        <span class="panel-label">Quick setup</span>
+                        <pre><code>export QWEATHER_API_BASE=https://api.qweather.com
+export QWEATHER_API_KEY=&lt;your-api-key&gt;
+
+npx -y qweather-mcp</code></pre>
+                    </div>
+
+                    <div class="panel-card feature-mini-grid">
+                        <div>
+                            <span class="mini-title">Forecasts</span>
+                            <p>3 / 7 / 10 / 15 / 30 day outlooks</p>
+                        </div>
+                        <div>
+                            <span class="mini-title">Alerts</span>
+                            <p>
+                                Warnings, precipitation, and lifestyle indices
+                            </p>
+                        </div>
+                        <div>
+                            <span class="mini-title">Air quality</span>
+                            <p>Current, hourly, and 3-day AQI data</p>
+                        </div>
+                        <div>
+                            <span class="mini-title">Ready to embed</span>
+                            <p>Works well in agent and automation pipelines</p>
+                        </div>
+                    </div>
+                </aside>
+            </header>
+
+            <main class="content">
+                <section class="section" aria-labelledby="overview-heading">
+                    <div class="section-heading">
+                        <p class="section-kicker">Overview</p>
+                        <h2 id="overview-heading">
+                            Designed for agents that need weather context fast.
+                        </h2>
+                        <p>
+                            The page is organized around the two real tasks most
+                            users have: install the server quickly, then
+                            understand which tools are worth wiring into
+                            prompts, automations, or local workflows.
+                        </p>
+                    </div>
+
+                    <div class="feature-grid">
+                        <article class="info-card">
+                            <h3>Current conditions</h3>
+                            <p>
+                                Temperature, feels-like, humidity, wind, and
+                                other essential real-time weather signals.
+                            </p>
+                        </article>
+                        <article class="info-card">
+                            <h3>Forecast horizons</h3>
+                            <p>
+                                Mix minutely precipitation, hourly forecast, and
+                                long-range daily forecasts in one server.
+                            </p>
+                        </article>
+                        <article class="info-card">
+                            <h3>Risk and decisions</h3>
+                            <p>
+                                Pull warnings, air quality, and lifestyle
+                                indices when the use case is more than “is it
+                                raining”.
+                            </p>
+                        </article>
+                        <article class="info-card">
+                            <h3>Deployable shape</h3>
+                            <p>
+                                Runtime configuration stays minimal: API base
+                                plus API key, no extra bootstrap ceremony.
+                            </p>
+                        </article>
+                    </div>
+                </section>
+
+                <section
+                    class="section section-install"
+                    id="install"
+                    aria-labelledby="install-heading"
+                >
+                    <div class="section-heading">
+                        <p class="section-kicker">Install & Run</p>
+                        <h2 id="install-heading">
+                            Two setup paths, one fast default.
+                        </h2>
+                    </div>
+
+                    <div class="install-grid">
+                        <article class="install-card install-card-primary">
+                            <div class="card-header">
+                                <span class="card-tag">Recommended</span>
+                                <h3>Install with Smithery</h3>
+                            </div>
+                            <p>
+                                Best when you want the quickest MCP client
+                                integration with the least manual setup.
+                            </p>
+                            <pre><code>npx -y @smithery/cli install @overstarry/qweather-mcp --client claude</code></pre>
+                        </article>
+
+                        <article class="install-card">
+                            <div class="card-header">
+                                <span class="card-tag">Manual</span>
+                                <h3>Export env and start stdio</h3>
+                            </div>
+                            <ol class="step-list">
+                                <li>
+                                    Get an API key from the QWeather Console.
+                                </li>
+                                <li>
+                                    Export the runtime environment variables.
+                                </li>
+                                <li>Start the stdio server from Node.js.</li>
+                            </ol>
+                            <pre><code>export QWEATHER_API_BASE=https://api.qweather.com
 export QWEATHER_API_KEY=&lt;your-api-key&gt;
 
 # start stdio server
-npx -y qweather-mcp
-</code></pre>
-      </section>
+npx -y qweather-mcp</code></pre>
+                        </article>
+                    </div>
+                </section>
 
-      <section>
-        <h2>Available Tools (selection)</h2>
-        <ul class="list">
-          <li>get-weather-now (current conditions)</li>
-          <li>get-weather-forecast (3/7/10/15/30-day)</li>
-          <li>get-minutely-precipitation (next 2 hours)</li>
-          <li>get-hourly-forecast (24/72/168-hour)</li>
-          <li>get-weather-warning (alerts)</li>
-          <li>get-weather-indices (lifestyle indices)</li>
-          <li>get-air-quality / hourly / daily</li>
-        </ul>
-      </section>
+                <section
+                    class="section"
+                    id="tools"
+                    aria-labelledby="tools-heading"
+                >
+                    <div class="section-heading">
+                        <p class="section-kicker">Tooling Surface</p>
+                        <h2 id="tools-heading">
+                            Grouped by the questions an agent actually asks.
+                        </h2>
+                    </div>
 
-      <section>
-        <h2>Developer Notes</h2>
-        <ul class="list">
-          <li>Build: <code>npm run build</code> (TypeScript compile + set executable bit)</li>
-          <li>Windows build: <code>npm run build:windows</code></li>
-          <li>Source: <code>src/index.ts</code>; Output: <code>build/index.js</code></li>
-          <li>Required env vars: <code>QWEATHER_API_BASE</code>, <code>QWEATHER_API_KEY</code></li>
-        </ul>
-      </section>
-    </main>
+                    <div class="tool-grid">
+                        <article class="tool-card">
+                            <h3>Current weather</h3>
+                            <ul class="list">
+                                <li>
+                                    <code>get-weather-now</code> for current
+                                    conditions
+                                </li>
+                                <li>
+                                    Fast access to temperature, feels-like,
+                                    wind, humidity, and visibility
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="tool-card">
+                            <h3>Forecasts</h3>
+                            <ul class="list">
+                                <li>
+                                    <code>get-weather-forecast</code> for 3 / 7
+                                    / 10 / 15 / 30-day forecasts
+                                </li>
+                                <li>
+                                    <code>get-hourly-forecast</code> for 24 / 72
+                                    / 168-hour forecasts
+                                </li>
+                                <li>
+                                    <code>get-minutely-precipitation</code> for
+                                    the next 2 hours
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="tool-card">
+                            <h3>Decision support</h3>
+                            <ul class="list">
+                                <li>
+                                    <code>get-weather-indices</code> for
+                                    lifestyle indices
+                                </li>
+                                <li>
+                                    <code>get-weather-warning</code> for severe
+                                    weather awareness
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="tool-card">
+                            <h3>Air quality</h3>
+                            <ul class="list">
+                                <li>
+                                    <code>get-air-quality</code> for real-time
+                                    air quality
+                                </li>
+                                <li>
+                                    <code>get-air-quality-hourly</code> for
+                                    hourly AQI trends
+                                </li>
+                                <li>
+                                    <code>get-air-quality-daily</code> for 3-day
+                                    air quality outlook
+                                </li>
+                            </ul>
+                        </article>
+                    </div>
+                </section>
 
-    <footer class="site-footer">
-      <p>© qweather-mcp</p>
-    </footer>
-  </body>
-  </html>
+                <section
+                    class="section section-developer"
+                    id="developer"
+                    aria-labelledby="developer-heading"
+                >
+                    <div class="section-heading">
+                        <p class="section-kicker">Developer Notes</p>
+                        <h2 id="developer-heading">
+                            Everything you need for local build and runtime
+                            wiring.
+                        </h2>
+                    </div>
+
+                    <div class="developer-grid">
+                        <article class="meta-card">
+                            <h3>Build commands</h3>
+                            <ul class="list">
+                                <li>
+                                    <code>npm run build</code> for TypeScript
+                                    compile and executable setup
+                                </li>
+                                <li>
+                                    <code>npm run build:windows</code> for
+                                    Windows packaging flow
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="meta-card">
+                            <h3>Project layout</h3>
+                            <ul class="list">
+                                <li>Source entry: <code>src/index.ts</code></li>
+                                <li>
+                                    Build output: <code>build/index.js</code>
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="meta-card">
+                            <h3>Required environment</h3>
+                            <ul class="list">
+                                <li><code>QWEATHER_API_BASE</code></li>
+                                <li><code>QWEATHER_API_KEY</code></li>
+                            </ul>
+                        </article>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="site-footer">
+                <p>qweather-mcp · Weather data for MCP-native workflows.</p>
+            </footer>
+        </div>
+    </body>
+</html>
