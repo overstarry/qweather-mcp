@@ -11,7 +11,7 @@ English | [简体中文](./README.zh-CN.md)
 
 - 🌤️ Real-time weather queries
 - 📅 Multi-day weather forecasts (3/7/10/15/30 days)
-- 🔑 Simple API key configuration
+- 🔐 JWT (EdDSA/Ed25519) **and** legacy API Key authentication
 - 🔌 Custom API base URL support
 - 🛠️ Complete tool integration
 
@@ -27,8 +27,7 @@ npx -y @smithery/cli install @overstarry/qweather-mcp --client claude
 
 ### Manual Configuration
 
-1. First, get your API Key from the [QWeather Console](https://console.qweather.com/).
-
+1. First, get your credentials from the [QWeather Console](https://console.qweather.com/).
 2. Start the server:
 
 ```bash
@@ -36,16 +35,53 @@ npx -y @smithery/cli install @overstarry/qweather-mcp --client claude
 npx -y qweather-mcp
 ```
 
-3. Configure environment variables:
+3. Configure environment variables (pick **one** of the two auth modes below).
+
+### 🔐 JWT Authentication (recommended)
+
+QWeather has announced that **API Key authentication will be deprecated in 2027** and recommends migrating to JWT (EdDSA + Ed25519). Generate an Ed25519 key pair, upload the public key to the QWeather console, and configure:
+
+```bash
+QWEATHER_API_BASE=https://<your-host>.qweatherapi.com
+QWEATHER_PROJECT_ID=<project-id>
+QWEATHER_KEY_ID=<credential-id>
+# Either pass the PEM path…
+QWEATHER_PRIVATE_KEY_PATH=/path/to/ed25519-private.pem
+# …or the PEM content directly (newlines preserved)
+# QWEATHER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+If both `QWEATHER_PRIVATE_KEY_PATH` and `QWEATHER_PRIVATE_KEY` are provided, the path takes precedence. For `QWEATHER_PRIVATE_KEY`, the literal two-character sequence `\n` is auto-converted to real newlines, so the single-line form above works in shells, `.env` files, and JSON configs.
+
+JSON config example:
+
+```json
+{
+  "mcpServers": {
+    "qweather": {
+      "command": "npx",
+      "args": ["-y", "qweather-mcp"],
+      "env": {
+        "QWEATHER_API_BASE": "https://<your-host>.qweatherapi.com",
+        "QWEATHER_PROJECT_ID": "<project-id>",
+        "QWEATHER_KEY_ID": "<credential-id>",
+        "QWEATHER_PRIVATE_KEY_PATH": "/path/to/ed25519-private.pem"
+      }
+    }
+  }
+}
+```
+
+JWT details: tokens are signed with `alg=EdDSA`, `iat` is back-dated 30s to tolerate clock skew, `exp = iat + 900s` (15 min, well under QWeather's 24h cap), and tokens are cached and reused until ~30s before expiry. See the [official authentication docs](https://dev.qweather.com/docs/configuration/authentication/#json-web-token).
+
+### 🔑 API Key Authentication (legacy)
 
 ```bash
 QWEATHER_API_BASE=https://api.qweather.com
 QWEATHER_API_KEY=<your-api-key>
 ```
 
-### JSON Configuration
-
-Add to your configuration file:
+JSON config example:
 
 ```json
 {
@@ -61,6 +97,19 @@ Add to your configuration file:
   }
 }
 ```
+
+### Mode detection
+
+| Env vars present | Mode |
+|---|---|
+| Full JWT vars (`QWEATHER_PROJECT_ID` + `QWEATHER_KEY_ID` + `QWEATHER_PRIVATE_KEY[_PATH]`) | **JWT** (wins even if `QWEATHER_API_KEY` is also set) |
+| Full JWT vars + `QWEATHER_API_KEY` | **JWT** (API Key is ignored) |
+| Partial JWT vars + `QWEATHER_API_KEY` | API Key, with a startup warning to stderr |
+| Partial JWT vars only | startup error |
+| `QWEATHER_API_KEY` only | API Key |
+| neither | startup error |
+
+The active mode is logged to stderr at startup, e.g. `Weather MCP Server running on stdio (auth: JWT/EdDSA)`.
 
 ## 🛠️ Available Tools
 

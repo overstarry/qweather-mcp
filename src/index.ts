@@ -1,14 +1,123 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { readFileSync } from "node:fs";
+import { SignJWT, importPKCS8, type KeyLike } from "jose";
 import { z } from "zod";
 
 const QWEATHER_API_BASE = process.env.QWEATHER_API_BASE
 if (!QWEATHER_API_BASE) {
     throw new Error("QWEATHER_API_BASE env is not set")
 }
-const QWEATHER_API_KEY = process.env.QWEATHER_API_KEY
-if (!QWEATHER_API_KEY) {
-    throw new Error("QWEATHER_API_KEY env is not set")
+
+// Authentication mode detection.
+// JWT mode requires: QWEATHER_PROJECT_ID + QWEATHER_KEY_ID + (QWEATHER_PRIVATE_KEY or QWEATHER_PRIVATE_KEY_PATH).
+// API Key mode requires: QWEATHER_API_KEY (legacy, deprecated by QWeather in 2027).
+type AuthMode =
+    | { kind: "jwt"; projectId: string; keyId: string; privateKeyPem: string }
+    | { kind: "apiKey"; apiKey: string };
+
+function detectAuthMode(): AuthMode {
+    const projectId = process.env.QWEATHER_PROJECT_ID;
+    const keyId = process.env.QWEATHER_KEY_ID;
+    const privateKeyInline = process.env.QWEATHER_PRIVATE_KEY;
+    const privateKeyPath = process.env.QWEATHER_PRIVATE_KEY_PATH;
+    const apiKey = process.env.QWEATHER_API_KEY;
+
+    const hasJwtCore = Boolean(projectId && keyId);
+    const hasJwtKey = Boolean(privateKeyInline || privateKeyPath);
+    const hasAnyJwtVar = Boolean(projectId || keyId || privateKeyInline || privateKeyPath);
+
+    if (hasJwtCore && hasJwtKey) {
+        // _PATH takes precedence over inline PEM (more conventional for key material).
+        let privateKeyPem: string;
+        if (privateKeyPath) {
+            try {
+                privateKeyPem = readFileSync(privateKeyPath, "utf8");
+            } catch (err) {
+                throw new Error(`Failed to read QWEATHER_PRIVATE_KEY_PATH (${privateKeyPath}): ${(err as Error).message}`);
+            }
+        } else {
+            // Shell/.env exports often pass `\n` as the literal two-char sequence;
+            // normalize so users don't have to embed real newlines manually.
+            privateKeyPem = (privateKeyInline as string).replace(/\\n/g, "\n");
+        }
+        return {
+            kind: "jwt",
+            projectId: projectId as string,
+            keyId: keyId as string,
+            privateKeyPem,
+        };
+    }
+
+    // Incomplete JWT setup must not silently fall back to API Key — the user almost
+    // certainly intended to use JWT and would otherwise never realize it didn't take effect.
+    if (hasAnyJwtVar && !(hasJwtCore && hasJwtKey)) {
+        if (apiKey) {
+            console.warn(
+                "[qweather-mcp] Incomplete JWT configuration detected; falling back to QWEATHER_API_KEY. " +
+                "To use JWT, set QWEATHER_PROJECT_ID, QWEATHER_KEY_ID, and QWEATHER_PRIVATE_KEY[_PATH]."
+            );
+            return { kind: "apiKey", apiKey };
+        }
+        throw new Error(
+            "Incomplete JWT configuration. Set QWEATHER_PROJECT_ID, QWEATHER_KEY_ID, and one of QWEATHER_PRIVATE_KEY / QWEATHER_PRIVATE_KEY_PATH; or remove the JWT vars and set QWEATHER_API_KEY instead."
+        );
+    }
+
+    if (apiKey) {
+        return { kind: "apiKey", apiKey };
+    }
+
+    throw new Error(
+        "No QWeather credentials configured. Set either JWT env vars (QWEATHER_PROJECT_ID + QWEATHER_KEY_ID + QWEATHER_PRIVATE_KEY[_PATH]) or QWEATHER_API_KEY."
+    );
+}
+
+const AUTH_MODE = detectAuthMode();
+
+// JWT token cache: re-sign only when the cached token is within ~30s of expiry.
+const JWT_TTL_SECONDS = 900; // 15 minutes, well under QWeather's 24h cap
+const JWT_REFRESH_LEEWAY_SECONDS = 30;
+const JWT_IAT_BACKDATE_SECONDS = 30; // guard against minor clock skew
+
+let cachedJwt: { token: string; expiresAt: number } | null = null;
+let cachedPrivateKey: KeyLike | null = null;
+
+async function getJwtToken(jwt: Extract<AuthMode, { kind: "jwt" }>): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    if (cachedJwt && cachedJwt.expiresAt - now > JWT_REFRESH_LEEWAY_SECONDS) {
+        return cachedJwt.token;
+    }
+
+    if (!cachedPrivateKey) {
+        try {
+            cachedPrivateKey = await importPKCS8(jwt.privateKeyPem, "EdDSA");
+        } catch (err) {
+            throw new Error(
+                `Failed to parse Ed25519 private key. Expected PKCS#8 PEM beginning with "-----BEGIN PRIVATE KEY-----". Underlying error: ${(err as Error).message}`
+            );
+        }
+    }
+
+    const iat = now - JWT_IAT_BACKDATE_SECONDS;
+    const exp = iat + JWT_TTL_SECONDS;
+    const token = await new SignJWT({})
+        .setProtectedHeader({ alg: "EdDSA", kid: jwt.keyId })
+        .setIssuedAt(iat)
+        .setExpirationTime(exp)
+        .setSubject(jwt.projectId)
+        .sign(cachedPrivateKey);
+
+    cachedJwt = { token, expiresAt: exp };
+    return token;
+}
+
+async function buildAuthHeaders(): Promise<Record<string, string>> {
+    if (AUTH_MODE.kind === "apiKey") {
+        return { "X-QW-Api-Key": AUTH_MODE.apiKey };
+    }
+    const token = await getJwtToken(AUTH_MODE);
+    return { Authorization: `Bearer ${token}` };
 }
 
 // Create server instance
@@ -39,11 +148,8 @@ async function makeQWeatherRequest<T>(endpoint: string, params: Record<string, s
     });
 
     try {
-        const response = await fetch(url.toString(), {
-            headers: {
-                'X-QW-Api-Key': QWEATHER_API_KEY as string
-            }
-        });
+        const headers = await buildAuthHeaders();
+        const response = await fetch(url.toString(), { headers });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}, URL: ${url.toString()}`);
         }
@@ -1270,7 +1376,7 @@ function translateAdvice(advice: string): string {
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("Weather MCP Server running on stdio");
+    console.error(`Weather MCP Server running on stdio (auth: ${AUTH_MODE.kind === "jwt" ? "JWT/EdDSA" : "API Key"})`);
 }
 
 main().catch((error) => {
