@@ -4,28 +4,41 @@ startCommand:
   type: stdio
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
+    # Pick ONE auth mode: JWT (recommended) or API Key (legacy, deprecated 2027).
     type: object
     required:
       - qweatherApiBase
-      - qweatherApiKey
     properties:
       qweatherApiBase:
         type: string
-        description: The base URL for QWeather API. E.g., https://api.qweather.com
+        description: The base URL for QWeather API. E.g., https://api.qweather.com or https://<host>.qweatherapi.com
       qweatherApiKey:
         type: string
-        description: Your QWeather API key.
+        description: (Legacy API Key auth) Your QWeather API key. Will be deprecated by QWeather in 2027.
+      qweatherProjectId:
+        type: string
+        description: (JWT auth) QWeather project ID, used as JWT `sub` claim.
+      qweatherKeyId:
+        type: string
+        description: (JWT auth) QWeather credential ID, used as JWT `kid` header.
+      qweatherPrivateKey:
+        type: string
+        description: (JWT auth) Ed25519 private key in PKCS8 PEM format. Newlines must be preserved.
+      qweatherPrivateKeyPath:
+        type: string
+        description: (JWT auth) Path to an Ed25519 PKCS8 PEM file. Takes precedence over qweatherPrivateKey if both are set.
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
-    (config) => ({
-      command: 'node',
-      args: ['cli.js'],
-      env: {
-        QWEATHER_API_BASE: config.qweatherApiBase,
-        QWEATHER_API_KEY: config.qweatherApiKey
-      }
-    })
+    (config) => {
+      const env = { QWEATHER_API_BASE: config.qweatherApiBase };
+      if (config.qweatherApiKey) env.QWEATHER_API_KEY = config.qweatherApiKey;
+      if (config.qweatherProjectId) env.QWEATHER_PROJECT_ID = config.qweatherProjectId;
+      if (config.qweatherKeyId) env.QWEATHER_KEY_ID = config.qweatherKeyId;
+      if (config.qweatherPrivateKey) env.QWEATHER_PRIVATE_KEY = config.qweatherPrivateKey;
+      if (config.qweatherPrivateKeyPath) env.QWEATHER_PRIVATE_KEY_PATH = config.qweatherPrivateKeyPath;
+      return { command: 'node', args: ['cli.js'], env };
+    }
   exampleConfig:
     qweatherApiBase: https://api.qweather.com
     qweatherApiKey: dummy-api-key-123456

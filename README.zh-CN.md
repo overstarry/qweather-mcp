@@ -11,7 +11,7 @@
 
 - 🌤️ 实时天气查询
 - 📅 多天天气预报（3/7/10/15/30天）
-- 🔑 简单的API密钥配置
+- 🔐 同时支持 JWT (EdDSA/Ed25519) 与传统 API Key 认证
 - 🔌 自定义API基础URL支持
 - 🛠️ 完整的工具集成
 
@@ -27,8 +27,7 @@ npx -y @smithery/cli install @overstarry/qweather-mcp --client claude
 
 ### 手动配置
 
-1. 首先，从[和风天气控制台](https://console.qweather.com/)获取您的API密钥。
-
+1. 首先，从[和风天气控制台](https://console.qweather.com/)获取您的凭据。
 2. 启动服务器：
 
 ```bash
@@ -36,16 +35,53 @@ npx -y @smithery/cli install @overstarry/qweather-mcp --client claude
 npx -y qweather-mcp
 ```
 
-3. 配置环境变量：
+3. 配置环境变量（在下面两种认证方式中**任选其一**）。
+
+### 🔐 JWT 认证（推荐）
+
+和风天气已宣布 **API Key 将于 2027 年弃用**，建议迁移到 JWT (EdDSA + Ed25519)。请先生成 Ed25519 密钥对，将公钥上传至和风天气控制台，然后配置：
+
+```bash
+QWEATHER_API_BASE=https://<your-host>.qweatherapi.com
+QWEATHER_PROJECT_ID=<项目ID>
+QWEATHER_KEY_ID=<凭据ID>
+# 方式一：传入 PEM 文件路径
+QWEATHER_PRIVATE_KEY_PATH=/path/to/ed25519-private.pem
+# 方式二：直接传入 PEM 内容（保留换行）
+# QWEATHER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+如果同时设置了 `QWEATHER_PRIVATE_KEY_PATH` 和 `QWEATHER_PRIVATE_KEY`，路径优先生效。`QWEATHER_PRIVATE_KEY` 中的字面 `\n`（两字符序列）会自动转换为真实换行，因此 shell、`.env` 文件和 JSON 配置中的单行写法均可直接使用。
+
+JSON 配置示例：
+
+```json
+{
+  "mcpServers": {
+    "qweather": {
+      "command": "npx",
+      "args": ["-y", "qweather-mcp"],
+      "env": {
+        "QWEATHER_API_BASE": "https://<your-host>.qweatherapi.com",
+        "QWEATHER_PROJECT_ID": "<项目ID>",
+        "QWEATHER_KEY_ID": "<凭据ID>",
+        "QWEATHER_PRIVATE_KEY_PATH": "/path/to/ed25519-private.pem"
+      }
+    }
+  }
+}
+```
+
+JWT 细节：使用 `alg=EdDSA` 签名；`iat` 回拨 30 秒以容忍时钟漂移；`exp = iat + 900s`（15 分钟，远低于官方 24h 上限）；Token 缓存复用，过期前约 30 秒才会重新签发。详见[官方认证文档](https://dev.qweather.com/docs/configuration/authentication/#json-web-token)。
+
+### 🔑 API Key 认证（传统方式）
 
 ```bash
 QWEATHER_API_BASE=https://api.qweather.com
 QWEATHER_API_KEY=<your-api-key>
 ```
 
-### JSON 配置
-
-在您的配置文件中添加：
+JSON 配置示例：
 
 ```json
 {
@@ -61,6 +97,19 @@ QWEATHER_API_KEY=<your-api-key>
   }
 }
 ```
+
+### 模式检测
+
+| 已设置的环境变量 | 启用模式 |
+|---|---|
+| 完整 JWT 变量（`QWEATHER_PROJECT_ID` + `QWEATHER_KEY_ID` + `QWEATHER_PRIVATE_KEY[_PATH]`） | **JWT**（即使同时设置了 `QWEATHER_API_KEY` 也优先走 JWT） |
+| 完整 JWT 变量 + `QWEATHER_API_KEY` | **JWT**（API Key 被忽略） |
+| 部分 JWT 变量 + `QWEATHER_API_KEY` | API Key，并向 stderr 输出警告 |
+| 仅部分 JWT 变量 | 启动报错 |
+| 仅 `QWEATHER_API_KEY` | API Key |
+| 都未设置 | 启动报错 |
+
+启动时 stderr 会打印当前生效的认证模式，例如：`Weather MCP Server running on stdio (auth: JWT/EdDSA)`。
 
 ## 🛠️ 可用工具
 
